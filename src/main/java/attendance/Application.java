@@ -129,7 +129,7 @@ public class Application {
 
         // 로컬 시간 계산
 //        LocalDateTime systemTime = DateTimes.now();
-        LocalDateTime systemTime = LocalDateTime.of(2025,12,12,10,10);
+        LocalDateTime systemTime = LocalDateTime.of(2024,12,12,10,10);
         LocalDate currentDateAndTime = systemTime.toLocalDate();
         int currentMonth = systemTime.getMonthValue();
         int currentDay = systemTime.getDayOfMonth();
@@ -184,11 +184,14 @@ public class Application {
                 }
 //                3. 캘린더에서 이름이 조회 되면 에러
                 System.out.println("조회 날짜 형식 " + currentDateAndTime);
-                List<Attendance> attendancesResult = myCalender.get(currentDateAndTime);
-                String isAlreadyAttendance = attendancesResult.stream()
-                        .filter(attendance -> attendance.getName() == nickNameInput)
-                        .toString();
-                if(isAlreadyAttendance.length() > 0){
+
+                //현재 날짜로 조회한 출석 부
+                List<Attendance> attendancesResult = sortedCalender.get(currentDateAndTime);
+
+                 boolean isAlreadyAttendance = attendancesResult.stream()
+                        .filter(attendance -> attendance.getName() == nickNameInput).findFirst().isPresent();
+
+                if(isAlreadyAttendance){
                     throw new IllegalArgumentException(ErrorMessage.ALREADY_ATTENDACNED);
                 }
 
@@ -201,7 +204,7 @@ public class Application {
                     throw new IllegalArgumentException(ErrorMessage.NO_CAMPUS_RUNNINGTIME);
                 }
 
-                String roll = checkRoll(currentDate,mondayClassStartTime,classEndTime,attendanceTime);
+                String roll = checkRoll(currentDate,mondayClassStartTime,classStartTime,attendanceTime);
 
 //            4. 캘린더 List에 새로운 데이터로 저장
                 Attendance newAttendance = new Attendance(nickNameInput,attendanceTime, roll);
@@ -227,13 +230,13 @@ public class Application {
 
 
     }
-    public static String checkRoll(String dateOfInput, LocalTime startTime, LocalTime endTime, LocalTime time){
+    public static String checkRoll(String dateOfInput, LocalTime mondayStartTime, LocalTime startTime, LocalTime time){
         // 4. 요일에 해당하는 출근 시간과 입력 받은 출근 시간 비교
         Duration timeDiff = null;
         if ( dateOfInput.equals("MONDAY") ) {
-            timeDiff = Duration.between(startTime,time);
+            timeDiff = Duration.between(mondayStartTime,time);
         }else{
-            timeDiff = Duration.between(endTime,time);
+            timeDiff = Duration.between(startTime,time);
         }
 
         // 5. 출석,결석,지각 여부 판별
