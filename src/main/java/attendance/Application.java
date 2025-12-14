@@ -7,6 +7,7 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.util.HashMap;
 import java.util.List;
@@ -15,27 +16,32 @@ import java.util.Locale;
 public class Application {
     public static void main(String[] args) {
 
-        // 출석 기록 불러오기
+        // 캘린더 생성 (출석 기록)
         HashMap<LocalDateTime, List<Attendance>> myCalender = new HashMap<>();
 
-
-        try{
-            String fileName = "src/main/resources/attendance.md";
+        // 파일 입력 받고 저장하기
+        try {
+            String fileName = "src/main/resources/attendances.csv";
             FileReader file = new FileReader(fileName);
             BufferedReader bufferedReader = new BufferedReader(file);
 
             bufferedReader.readLine();
-            String line = bufferedReader.readLine();
-            while (line != null) {
+            DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+            while (true) {
+                String line = bufferedReader.readLine();
+                if (line == null) {
+                    break;
+                }
                 String[] input = line.split(",");
                 String nickNameInput = input[0];
+                LocalDateTime dateTimeInput = LocalDateTime.parse(input[1], dateTimeFormatter);
+                System.out.println("Nickname: " + nickNameInput + " attendance time : " + dateTimeInput);
 
             }
-
-        }catch (IOException e){
+            bufferedReader.close();
+        } catch (IOException e) {
             System.out.println("[ERROR] 파일 불러오기에 실패했습니다.");
         }
-        // 파일 입력 받기
 
 
         // 로컬 시간 계산
@@ -46,10 +52,10 @@ public class Application {
         String currentDateDisplay = systemTime.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.KOREAN);
 
         // 서비스 실행 (루프 시작)
-        while(true){
+        while (true) {
 
             // 기본 안내 메시지
-            System.out.printf("오늘은 %d월 %d일 %s입니다. 기능을 선택해주세요.\n",currentMonth,currentDay, currentDateDisplay);
+            System.out.printf("오늘은 %d월 %d일 %s입니다. 기능을 선택해주세요.\n", currentMonth, currentDay, currentDateDisplay);
             System.out.println("1. 출석 확인\n"
                     + "2. 출석 수정\n"
                     + "3. 크루별 출석 기록 확인\n"
@@ -60,16 +66,14 @@ public class Application {
 
             String command = Console.readLine();
 
-
-
             // 종료 조건
             boolean isContinue = true;
-            while(isContinue){
+            while (isContinue) {
                 String isQuit = Console.readLine();
-                if(isQuit.equals("Q")){
+                if (isQuit.equals("Q")) {
                     isContinue = false;
                     return;
-                }else{
+                } else {
 
                 }
             }
