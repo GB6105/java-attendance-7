@@ -3,12 +3,9 @@ package attendance;
 import attendance.domain.Attendance;
 import camp.nextstep.edu.missionutils.Console;
 import camp.nextstep.edu.missionutils.DateTimes;
-import com.sun.jdi.connect.AttachingConnector;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -17,10 +14,12 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.TreeMap;
 
 public class Application {
@@ -43,7 +42,7 @@ public class Application {
         campusEndTime = LocalTime.parse("23:00", format);
 
         // 멤버 데이터 저장
-
+        Set<String> memberSet = new HashSet<>();
 
         // 파일 입력 받고 저장하기
         try {
@@ -80,13 +79,6 @@ public class Application {
                 String dateOfInput = dateTimeInput.getDayOfWeek().toString();
 
             // 4. 요일에 해당하는 출근 시간과 입력 받은 출근 시간 비교
-//               long timeDiff = 0 ;
-//
-//                if (dateOfInput.equals("Monday")) {
-//                    timeDiff = mondayClassStartTime.getTime() - time;
-//                }else{
-//                    timeDiff = classStartTime.getTime() - time;
-//                }
                 Duration timeDiff = null;
                 if ( dateOfInput.equals("MONDAY") ) {
                     timeDiff = Duration.between(mondayClassStartTime,time);
@@ -119,9 +111,14 @@ public class Application {
                     attendances.add(attendance);
                     myCalender.put(date,attendances);
                 }
+                memberSet.add(nickNameInput);
             }
+
+
+            // 정렬
             sortedCalender = new TreeMap<>(myCalender);
 
+            // 파일 끝
             bufferedReader.close();
         } catch (IOException e) {
             System.out.println("[ERROR] 파일 불러오기에 실패했습니다.");
@@ -160,6 +157,15 @@ public class Application {
             // 입력 받기
 
             String command = Console.readLine();
+
+            if(command.equals("1")){
+                System.out.println("닉네임을 입력해 주세요.");
+                String nickNameInput = Console.readLine();;
+                if(!memberSet.contains(nickNameInput)){
+                };
+            }
+
+
 
             // 종료 조건
             boolean isContinue = true;
