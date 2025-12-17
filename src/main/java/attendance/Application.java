@@ -3,11 +3,9 @@ package attendance;
 import attendance.domain.Attendance;
 import attendance.util.ErrorMessage;
 import camp.nextstep.edu.missionutils.Console;
-import camp.nextstep.edu.missionutils.DateTimes;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.sql.SQLOutput;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -23,7 +21,6 @@ import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
-import net.bytebuddy.asm.Advice.Local;
 
 public class Application {
     public static void main(String[] args) {
@@ -31,6 +28,7 @@ public class Application {
         // 캘린더 생성 (출석 기록)
         HashMap<LocalDate, List<Attendance>> myCalender = new HashMap<>();
         TreeMap<LocalDate, List<Attendance>> sortedCalender = new TreeMap<>();
+
         LocalTime mondayClassStartTime = null;
         LocalTime classStartTime = null;
         LocalTime classEndTime = null;
@@ -92,11 +90,12 @@ public class Application {
             // 5. 출석,결석,지각 여부 판별
                 String roll = "";
 
-                if(timeDiff.getSeconds() <= 0){
+                if(timeDiff.getSeconds() <= 5 * 60){
                     roll = "출석";
-                }else if(timeDiff.getSeconds() <= 5 * 60){
+                }else if(timeDiff.getSeconds() <= 30 * 60){
                     roll = "지각";
-                }else{
+                }else
+                {
                     roll = "결석";
                 }
 
@@ -137,16 +136,16 @@ public class Application {
         String currentDateDisplay = systemTime.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.KOREAN);
 
         // 디버깅 코드
-//        Iterator<Entry<LocalDate, List<Attendance>>> iterator = sortedCalender.entrySet().iterator();
-//        while (iterator.hasNext()){
-//            Entry<LocalDate, List<Attendance>> entry = iterator.next();
-//            LocalDate localDate = entry.getKey();
-//            List<Attendance> attendances = entry.getValue();
-//            for(Attendance attendance : attendances){
-//                System.out.println("날짜 : " + localDate + "/ 출석자 이름 : " + attendance.getName() + "/ 출석 시간 : " + attendance.getAttendanceTime().toString() + "/ 출결 : " + attendance.getRoll());
-//
-//            }
-//        }
+        Iterator<Entry<LocalDate, List<Attendance>>> iterator = sortedCalender.entrySet().iterator();
+        while (iterator.hasNext()){
+            Entry<LocalDate, List<Attendance>> entry = iterator.next();
+            LocalDate localDate = entry.getKey();
+            List<Attendance> attendances = entry.getValue();
+            for(Attendance attendance : attendances){
+                System.out.println("날짜 : " + localDate + "/ 출석자 이름 : " + attendance.getName() + "/ 출석 시간 : " + attendance.getAttendanceTime().toString() + "/ 출결 : " + attendance.getRoll());
+
+            }
+        }
 
         // 서비스 실행 (루프 시작)
         while (true) {
@@ -214,18 +213,98 @@ public class Application {
             }
 
 
+//            1. 출석 수정 진입 시
+            if(command.equals("2")){
+
+//                1. 현재 시간을 로컬로 계산 (저장)
+//                2. 캘린더에서 날자 조회 (저장)
+//                3. 요일 조회 (저장)
+//                    1. 요일이 (토-일, 공휴일) 인 경우 에러 발생
+//            2. 이름 입력 받기
+                System.out.println("출석을 수정하려는 크루의 닉네임을 입력해 주세요.");
+                String nickNameInput = Console.readLine();
+//                1. 형식 에러
+//                2. 이름이 멤버 데이터에 없으면 에러
+                if(!memberSet.contains(nickNameInput)){
+                    throw new IllegalArgumentException(ErrorMessage.NO_NICKNAME_MATCH_FOUND);
+                }
+//            3. 날짜 입력 받기
+                System.out.println("수정하려는 날짜(일) 을 입력해 주세요.");
+                String fixDateInput = Console.readLine();
+                if(fixDateInput.length() == 1){
+                    fixDateInput = "0" +fixDateInput;
+                }
+                String prefixDateInput = "2024-12-"+fixDateInput;
+                LocalDate fixDate = LocalDate.parse(prefixDateInput, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                String dateOfFixDate = fixDate.getDayOfWeek().toString();
+//                1. 형식 에러
+//                2. 로컬 날짜 이후인 경우 에러
+                if(fixDate.isAfter(currentDateAndTime)){
+                    throw new IllegalArgumentException(ErrorMessage.CANNOT_FIX_TIME);
+                }
+//                3. 공휴일 일 경우 에러
+                if (dateOfFixDate.equals("SUNDAY") || dateOfFixDate.equals("SATURDAY")) {
+                    System.out.printf("%d월 %d일 %s은 등교일이 아닙니다.\n ", currentMonth, currentDay, currentDateDisplay);
+                    throw new IllegalArgumentException("등교일이 아닙니다.");
+                }
+//            4. 시간 입력 받기
+                System.out.println("언제로 변경하겠습니까?");
+                String fixTimeInput = Console.readLine();
+                LocalTime fixTime = LocalTime.parse(fixTimeInput, DateTimeFormatter.ofPattern("HH:mm"));
+//                1. 캠퍼스 운영시간이 아니면 에러
+                if(fixTime.isBefore(campusStartTime) || fixTime.isAfter(campusEndTime)){
+                    throw new IllegalArgumentException(ErrorMessage.NO_CAMPUS_RUNNINGTIME);
+                }
+
+                String roll = checkRoll(dateOfFixDate,mondayClassStartTime,classStartTime,fixTime);
+//                1. 형식 에러
+//                2. 캠퍼스 운영시간보다 이르거나 느리면 에러 발생
+//            5. 캘린더 List에 새로운 데이터로 저장
+                List<Attendance> attendancesResult = sortedCalender.get(fixDate);
+                System.out.println("수정 목표 날짜" + fixDate + "수정 목표 이름 " + nickNameInput);
+//                for(Attendance attendance : attendancesResult){
+//                    System.out.println(attendance.getName() + " 이름 " );
+//                }
+                Attendance oldAttendance = attendancesResult.stream()
+                        .filter(attendance -> attendance.getName().equals(nickNameInput))
+                        .findFirst()
+                        .orElse(null);
+
+                LocalTime oldTime = oldAttendance.getAttendanceTime();
+                String oldRoll = oldAttendance.getRoll();
+
+                int newMonth = fixDate.getMonthValue();
+                int newDay = fixDate.getDayOfMonth();
+                String newDate = fixDate.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.KOREAN);
+
+                attendancesResult.remove(oldAttendance);
+                Attendance newAttendance = new Attendance(nickNameInput,fixTime, roll);
+                attendancesResult.add(newAttendance);
+                sortedCalender.put(fixDate,attendancesResult);
+                System.out.printf("%d월 %d일 %s %s (%s) -> %s (%s) 수정 완료!\n",
+                        newMonth, newDay,newDate, oldTime.toString(),oldRoll,
+                        fixTime.toString(), roll);
+
+            }
+
+
+
+            if(command.equals("Q")){
+                return;
+            }
+
 
             // 종료 조건
-            boolean isContinue = true;
-            while (isContinue) {
-                String isQuit = Console.readLine();
-                if (isQuit.equals("Q")) {
-                    isContinue = false;
-                    return;
-                } else {
-
-                }
-            }
+//            boolean isContinue = true;
+//            String isQuit = Console.readLine();
+//            while (isContinue) {
+//                if (isQuit.equals("Q")) {
+//                    isContinue = false;
+//                    return;
+//                } else {
+//
+//                }
+//            }
         }
 
 
@@ -242,11 +321,12 @@ public class Application {
         // 5. 출석,결석,지각 여부 판별
         String roll = "";
 
-        if(timeDiff.getSeconds() <= 0){
+        if(timeDiff.getSeconds() <= 5 * 60){
             roll = "출석";
-        }else if(timeDiff.getSeconds() <= 5 * 60){
+        }else if(timeDiff.getSeconds() <= 30 * 60){
             roll = "지각";
-        }else{
+        }else
+        {
             roll = "결석";
         }
         return roll;

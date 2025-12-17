@@ -23,7 +23,7 @@ public class Attendance {
         return name;
     }
 
-    public void setName(LocalTime attendanceTime) {
+    public void setTime(LocalTime attendanceTime) {
         this.attendanceTime = attendanceTime;
     }
 
