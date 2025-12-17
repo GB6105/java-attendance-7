@@ -3,9 +3,11 @@ package attendance;
 import attendance.domain.Attendance;
 import attendance.util.ErrorMessage;
 import camp.nextstep.edu.missionutils.Console;
+import camp.nextstep.edu.missionutils.DateTimes;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.text.ParseException;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -18,6 +20,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
@@ -127,8 +130,8 @@ public class Application {
         }
 
         // 로컬 시간 계산
-//        LocalDateTime systemTime = DateTimes.now();
-        LocalDateTime systemTime = LocalDateTime.of(2024,12,12,10,10);
+        LocalDateTime systemTime = DateTimes.now();
+//        LocalDateTime systemTime = LocalDateTime.of(2024,12,12,10,10);
         LocalDate currentDateAndTime = systemTime.toLocalDate();
         int currentMonth = systemTime.getMonthValue();
         int currentDay = systemTime.getDayOfMonth();
@@ -168,15 +171,14 @@ public class Application {
 //                3. 요일 조회 (반환)
 //                    1. 요일이 (토-일, 공휴일) 인 경우 에러 발생
                 if (currentDate.equals("SUNDAY") || currentDate.equals("SATURDAY")) {
-                    System.out.printf("%d월 %d일 %s은 등교일이 아닙니다.\n ", currentMonth, currentDay, currentDateDisplay);
-                    throw new IllegalArgumentException("등교일이 아닙니다.");
+                    String errorMessage = String.format("[ERROR] %d월 %d일 %s은 등교일이 아닙니다.\n ", currentMonth, currentDay, currentDateDisplay);
+                    throw new IllegalArgumentException(errorMessage);
                 }
 
 //            2. 이름 입력 받기
                 System.out.println("닉네임을 입력해 주세요.");
                 String nickNameInput = Console.readLine();;
 //                1. 형식 에러
-
 //                2. 이름이 멤버 데이터에 없으면 에러
                 if(!memberSet.contains(nickNameInput)){
                     throw new IllegalArgumentException(ErrorMessage.NO_NICKNAME_MATCH_FOUND);
@@ -197,6 +199,8 @@ public class Application {
 //            3. 시간 입력 받기
                 System.out.println("등교 시간을 입력해 주세요.");
                 String attendanceTimeInput = Console.readLine();
+//                0. 형식 에러
+                checkTimeInputType(attendanceTimeInput);
                 LocalTime attendanceTime = LocalTime.parse(attendanceTimeInput, DateTimeFormatter.ofPattern("HH:mm"));
 //                1. 캠퍼스 운영시간이 아니면 에러
                 if(attendanceTime.isBefore(campusStartTime) || attendanceTime.isAfter(campusEndTime)){
@@ -244,21 +248,21 @@ public class Application {
                 }
 //                3. 공휴일 일 경우 에러
                 if (dateOfFixDate.equals("SUNDAY") || dateOfFixDate.equals("SATURDAY")) {
-                    System.out.printf("%d월 %d일 %s은 등교일이 아닙니다.\n ", currentMonth, currentDay, currentDateDisplay);
-                    throw new IllegalArgumentException("등교일이 아닙니다.");
+                    String errorMessage = String.format("%d월 %d일 %s은 등교일이 아닙니다.\n ", currentMonth, currentDay, currentDateDisplay);
+                    throw new IllegalArgumentException(errorMessage);
                 }
 //            4. 시간 입력 받기
                 System.out.println("언제로 변경하겠습니까?");
                 String fixTimeInput = Console.readLine();
+//                1. 형식 에러
+                checkTimeInputType(fixTimeInput);
                 LocalTime fixTime = LocalTime.parse(fixTimeInput, DateTimeFormatter.ofPattern("HH:mm"));
-//                1. 캠퍼스 운영시간이 아니면 에러
+//                2. 캠퍼스 운영시간보다 이르거나 느리면 에러 발생
                 if(fixTime.isBefore(campusStartTime) || fixTime.isAfter(campusEndTime)){
                     throw new IllegalArgumentException(ErrorMessage.NO_CAMPUS_RUNNINGTIME);
                 }
 
                 String roll = checkRoll(dateOfFixDate,mondayClassStartTime,classStartTime,fixTime);
-//                1. 형식 에러
-//                2. 캠퍼스 운영시간보다 이르거나 느리면 에러 발생
 //            5. 캘린더 List에 새로운 데이터로 저장
                 List<Attendance> attendancesResult = sortedCalender.get(fixDate);
                 System.out.println("수정 목표 날짜" + fixDate + "수정 목표 이름 " + nickNameInput);
@@ -287,26 +291,96 @@ public class Application {
 
             }
 
+            if(command.equals("3")){
+                System.out.println("닉네임을 입력해 주세요.");
+                String nickNameInput = Console.readLine();
+                if(!memberSet.contains(nickNameInput)){
+                    throw new IllegalArgumentException(ErrorMessage.NO_NICKNAME_MATCH_FOUND);
+                }
+                System.out.println("이번 달 " + nickNameInput +"의 출석 기록 입니다.");
 
+                int attendanceCount = 0;
+                int lateCount = 0;
+                int absenceCount = 0;
+
+                Iterator<Entry<LocalDate,List<Attendance>>> entries = sortedCalender.entrySet().iterator();
+                while(entries.hasNext()){
+                    Entry<LocalDate,List<Attendance>> entry = entries.next();
+                    LocalDate currDate = entry.getKey();
+                    if(currDate.isEqual(currentDateAndTime)){
+                        continue;
+                    }
+                    List<Attendance> attendancesList = entry.getValue();
+                    Attendance attendanceResult = attendancesList.stream()
+                            .filter(attendance -> attendance.getName().equals(nickNameInput))
+                            .findFirst()
+                            .orElse(null);
+                    String time = "";
+                    String roll = "";
+                    if(attendanceResult == null){
+                        time = "--:--";
+                        roll = "결석";
+                    }else{
+                        time = attendanceResult.getAttendanceTime().toString();
+                        roll = attendanceResult.getRoll();
+                    }
+
+                    if(roll == "출석"){
+                        attendanceCount++;
+                    }else if(roll == "지각"){
+                        lateCount++;
+                    }else{
+                        absenceCount++;
+                    }
+
+                    int currMonth = currDate.getMonthValue();
+                    int currDay = currDate.getDayOfMonth();
+                    String formattedDay = String.format("%02d",currDay);
+                    String currDateDisplay = currDate.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.KOREAN);
+
+                    System.out.println(currMonth + "월 " +formattedDay + "일 " + currDateDisplay +" " + time + " (" + roll + ")");
+
+                }
+                System.out.println("출석: " + attendanceCount + "회");
+                System.out.println("지각: " + lateCount + "회");
+                System.out.println("결석: " + absenceCount + "회");
+
+                if(lateCount >3){
+                    absenceCount += lateCount/3;
+                }
+                if(absenceCount >5){
+                    System.out.println("제적 대상자입니다.");
+                }else if(absenceCount >=3){
+                    System.out.println("면담 대상자입니다.");
+                }else if(absenceCount >=2){
+                    System.out.println("경고 대상자입니다.");
+                }
+            }
+
+            if(command.equals("4")){
+                System.out.println("제적 위험자 조회 결과");
+
+            }
 
             if(command.equals("Q")){
                 return;
             }
 
 
-            // 종료 조건
-//            boolean isContinue = true;
-//            String isQuit = Console.readLine();
-//            while (isContinue) {
-//                if (isQuit.equals("Q")) {
-//                    isContinue = false;
-//                    return;
-//                } else {
-//
-//                }
-//            }
         }
 
+
+    }
+    public static void checkTimeInputType(String timeInput){
+        String[] times = timeInput.split(":");
+        if(times.length != 2){
+            throw new IllegalArgumentException(ErrorMessage.TYPE_ERROR);
+        }
+        int hour = Integer.parseInt(times[0]);
+        int minute = Integer.parseInt(times[1]);
+        if(hour < 0 || hour > 23 || minute < 0 || minute > 59){
+            throw new IllegalArgumentException(ErrorMessage.TYPE_ERROR);
+        }
 
     }
     public static String checkRoll(String dateOfInput, LocalTime mondayStartTime, LocalTime startTime, LocalTime time){
